@@ -276,12 +276,12 @@ l
 
 If you are going to use a for loop, always allocate the vector ahead of time  
 Always define what you are going to loop over, ideally with something like `seq_along()`.  
-    - The reason you do not want to use `1:length()`:  
-        - Consider:  
-        - `x <- runif(0)`  
-        - `seq_along(x)`  
-        - `1:length(x)`  
-        - Length zero input will generate a subscript out of bounds using 1:length since you are asking for start of 1 when
+* The reason you do not want to use `1:length()`:  
+    * Consider:  
+        * `x <- runif(0)`  
+        * `seq_along(x)`  
+        * `1:length(x)`  
+        * Length zero input will generate a subscript out of bounds using 1:length since you are asking for start of 1 when
           length is in fact zero.  
 
 
