@@ -325,7 +325,7 @@ df %>% keep (is.numeric) %>% map(mean) %>% as.data.frame()
 
 This function is always going to return dbl; should you return a data.frame or a vector?  
 In general, if your function accepts, or the key option your function takes is a df, you should return a df.  
-    - Even though a double vector is not wrong, and is conceptually simpler.  
+* Even though a double vector is not wrong, and is conceptually simpler.  
     
 #### Fitting a model to each data frame
 
@@ -376,8 +376,12 @@ Getting, setting values of attributes
 A matrix is not a class. Consider:  
 ```
 x <- matrix(1:20)
-class(x)
-attr(x, "class")`  
+class(x) # matrix
+attr(x, "class")` #NULL
+
+y <- data.frame(1:20)
+class(y) # data.frame
+attr(y, "class") # data.frame
 ```
 
 #### Generic functions
