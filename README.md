@@ -94,7 +94,7 @@ What can you put inside `[]`?
 `x1[[1]][[1]] <- NA`  
 `pryr::object.size(x1)` *16 MB; will copy the first list due to copy-on-modify semantics*   
 
-COnsider whether a name "has" an object, and not whether an object doesn't have a name (GC considerations).  
+Consider whether a name "has" an object, and not whether an object doesn't have a name (GC considerations).  
 This is a fairly subtle distinction-- the direction of the "arrow" is important from a mem usage perspective.  
 
 Note that `object.size()` will not be sufficient for this investigation-- would need to use `pryr`.  
@@ -195,8 +195,8 @@ Be careful using `which()`; logical algebra almost always clearer
 #### Isolated vs. Contextual
 
 Isolated code == Easier to understand (need less context to understand what is going on)  
-    * `baz <- foo(bar, qux)` vs. `df2 <- arrange(df, qux)`. 
-    * Can you read the single line and understand/infer what is going on?  
+* `baz <- foo(bar, qux)` vs. `df2 <- arrange(df, qux)`. 
+* Can you read the single line and understand/infer what is going on?  
 
 Consider:  
 `df[, vars]` 
