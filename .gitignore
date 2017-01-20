@@ -35,3 +35,8 @@ vignettes/*.pdf
 # Ignores
 *.Rproj
 *.html
+.Rproj.user
+
+rv3/
+colSummary/
+data/

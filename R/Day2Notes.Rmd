@@ -1,0 +1,606 @@
+---
+title: "Day2Notes"
+author: "Wen Zhang"
+date: "September 13, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#R Packages
+
+ROpenSci is a good resource to look at for package standards-- quite extensive code review for submitted packages.  
+
+####Common things found in R Packages:  
+
+1. R Code
+2. Data
+3. Documentation (man); function documentation
+4. Namespace
+5. Description (metadata)
+6. Vignettes; describe how the pieces of package fit together
+    - R Code (extracted)
+    - HTML
+7. Source (compiled) code, e.g. C, C++, Fortran
+    - Feasible to learn enough C or C++ within a few weeks to write useful code.
+8. Tests
+    - Basically double-entry bookkeeping-- describe function and test outputs using ref file(s)/test(s)
+
+
+```{r findPkgFuns, results="hold", eval=FALSE}
+library(ggplot2)
+help(package = ggplot2)
+#or
+ls("package:ggplot2")
+
+vignette() #list vignettes
+browseVignettes() #as well
+
+data() #list datasets
+```
+
+####Finding package source code
+
+cran package source (tar.gz), because cran only allows open source code.  
+R code obviously should be in R dir.  
+If a function contains compiled C code, can be found in src dir.  
+
+On your local system, for installed packages, you will find .db files-- for more efficient loading.  
+
+Most modern R packages are hosted on github, so if provided, can also go there to explore source code.  
+
+
+```{r libPaths, results="hold", eval=FALSE}
+.libPaths() #find where packages are installed
+```
+
+####Types of package
+
+There are two types of packages:  
+
+1. Packages you install from cran
+2. Packages installed in your library (which can be from cran or local or github, etc.).  
+
+Source --> Bundle --> Binary          --> Installed   --> In memory  
+files  --> tar.gz --> cached/compiled --> install cmd --> library()  
+
+Today, we will cover `load_all()`.  
+Also Build and Reload.  
+
+```{r rv2Install, results="hold", eval=FALSE}
+#rv2 is the complete package
+#test-me is one of the incomplete versions for learning.
+#Just install for now.
+
+#devtools::install("C:/Users/T450S/Desktop/RWorkShop2016/data/day-2/rv2")
+#help(package = rv2)
+
+```
+
+####Best practices for package naming:  
+
+1. Only lowercase letters and numbers
+2. Maybe add an 'r'
+3. Or find a related word and modify
+4. Easy to google/search on
+    - Weird names are good/specific
+5. Memorable
+
+Once you have a name you can create the package.  
+
+```{r createPkg, results = "hold", eval=FALSE}
+devtools::create("path/to/package")
+devtools::setup("existing/path/")
+
+#Both devtools and RStudio can be used. Both are fine-- we are going to use devtools today. 
+#Do not use package.skeleton().
+
+#Create a new package called rv3
+#devtools::create("C:/Users/T450S/Desktop/RWorkShop2016/rv3")
+#CTRL + . to quickly find function
+#Obviously, in rv3, /R is going to be blank upon creation.  
+```
+
+####Once you have R code (roxygenated), you can use a shortcut to load and use
+
+Note that you don't need to use `install()` or `document()` to actually load the R code.  
+This is quite handy.  
+
+```{r loadAll, results = "hold", eval=FALSE}
+
+#Navigate to the included, complete rv2/R dir
+#Copy the R files into your new rv3/R dir
+#Open rv3.Rproj
+
+devtools::load_all(".") #Or use KB Shortcut, CTRL + SHIFT + L
+rv3 <- dice(1:6)
+
+```
+
+
+####Function purity
+
+Impure functions = things that create side effects/affect the environment.  
+    - `library()`, `print()`, 'install.packages()`, `attach()`
+    - All the rng functions as well, since they do not only depend on input
+       - Or `Sys.time()`, `read.csv()`  
+       
+Things to avoid:  
+
+1. Instead of print(), use message(), to let users do things like:  
+    - `library(ggplot2, quietly = TRUE)`
+    - `suppressMessages(library(data.table))`
+
+```{r msgOptions, eval=FALSE}
+if (!quiet) {
+message("Processing file ", path)
+}
+if (is.null(by)) {
+by <- ...
+message("Joining by ", paste(by, collapse = ", "))
+}
+
+```
+
+Impure functions have very important functions. But don't use them in your packages as a rule, unless 
+this is what the purpose of your function is. 
+
+
+####Options
+
+If you must, capture current options at start, reset to original on exit.  
+
+```{r opts, eval=FALSE}
+# Bad!
+options(stringsAsFactors = FALSE)
+read.csv(path)
+# Better
+old <- options(stringsAsFactors = FALSE)
+on.exit(option(old), add = TRUE)
+read.csv(path)
+# Best: use stringsAsFactors arguments to specific
+# functions (not always possible)
+read.csv(path, stringsAsFactors = FALSE)
+
+```
+
+
+```{r onExit, eval=FALSE, results="hold"}
+#on.exit() runs regardless of how function exits (even if it fails-- unless R crashes)
+
+f <- function(x) {
+  on.exit(message("Hi!"), add = TRUE) #default is FALSE, so get into habit of setting to TRUE
+  if (x < 0) {
+    stop("!")
+  } else {
+    10
+  }
+}
+f(-10)
+f(10)
+
+#If you have multiple on.exit calls, add = TRUE is particularly important to set. 
+```
+
+
+Clean up after yourself if you change things.  
+
+```{r, eval=FALSE, results="hold"}
+f <- function(x) {
+  tmp <- tempfile()
+  on.exit(unlink(tmp), add = TRUE)
+  old_par <- par(bg = "red")
+  on.exit(par(old_par), add = TRUE)
+  plot(1:10)
+}
+```
+
+
+Don't mix side-effects and computation.  
+
+```{r, eval=FALSE, results="hold"}
+fortify.lm <- function(model, data = model$model, ...) {
+  infl <- influence(model, do.coef = FALSE)
+  data$.hat <- infl$hat
+  data$.sigma <- infl$sigma
+  data$.cooksd <- cooks.distance(model, infl)
+  data$.fitted <- predict(model)
+  data$.resid <- resid(model)
+  data$.stdresid <- rstandard(model, infl)
+  data
+}
+
+#Also
+
+mod <- lm(mpg ~ wt, data = mtcars)
+plot(mod)
+getS3method("plot", "lm") #Gets statistics and visualizes them. Quite long. Compare to fortify.lm
+#Makes reuse of code very difficult. 
+#ggplot2 takes a different approach-- viz is independent of computation. 
+```
+
+
+Improve this function:  
+```{r, eval=FALSE, results="hold"}
+# plot_function <- function(f, xlim = c(0, 1), n = 100) {
+#   x <- seq(xlim[1], xlim[2], length.out = n)
+#   y <- f(x)
+#   print(paste0("Using ", n, " points"))
+#   par(bg = "grey90")
+#   plot(x, y, xlab = "x", ylab = "f(x)", type = "l")
+# }
+# plot_function(sin)
+# plot(runif(5))
+```
+
+One way to do this, to at least reset color par option, although still munging together data and plot:  
+    - And using message instead of print.  
+
+
+    
+```{r, eval=FALSE, results="hide"}
+plot_function_2 <- function(f, xlim = c(0, 1), n = 100) {
+  
+  x <- seq(xlim[1], xlim[2], length.out = n)
+  y <- f(x)
+  
+  
+  message("Using ", n, " points") #message does not require paste
+  opar <- par("bg") 
+  par(bg = "grey90")
+  plot(x, y, xlab = "x", ylab = "f(x)", type = "l")
+  
+  on.exit(par("bg" = opar), add = TRUE)
+}
+
+plot_function_2(sin)
+plot(runif(5))
+
+suppressMessages(plot_function_2(sin))
+plot(runif(5))
+
+```
+
+An alternative, better:  
+
+```{r, eval=FALSE, results="hide"}
+grid_function <- function(f, xlim = c(0, 1), n = 100, quiet = FALSE) {
+  if (!quiet) {
+    message("Using xlim: ", xlim[1], "-", xlim[2])
+  }
+  if (!quiet) {
+    message("Using ", n, " points")
+  }
+  x <- seq(xlim[1], xlim[2], length.out = n)
+  y <- f(x)
+  data.frame(x, y)
+}
+
+plot_function <- function(f, xlim = c(0, 1), n = NULL) {
+  fun <- grid_function(f, xlim, n)
+  old <- par(bg = "grey90")
+  on.exit(par(old), add = TRUE)
+  plot(fun$x, fun$y, xlab = "x", ylab = "f(x)",
+       type = "l")
+}
+
+```
+
+
+###DESCRIPTION file
+
+Default template to get you started.  
+    - Note that if KB shortcuts do not work in RStudio, it is probably because your package lacks a DESCRIPTION
+    
+Depends, Imports, and Suggests:  
+    - Depends basically to describe what version of R you need (optional version spec)
+        - Can use this to also list packages, but this is deprecated and generally should not be used. 
+    - Imports are things you NEED-- installed automatically if needed. These are required. 
+    - Suggests are nice to have, not installed automatically
+
+Note that packages in Imports are installed, but not necessarily loaded.  
+If in DESCRIPTION: Imports: foo  
+Then call foo via foo::  
+
+It is probably better to use double colons to be explicit in your package functions.  
+
+If you are using suggested packages:  
+
+```{r, eval=FALSE, results="hide"}
+new_function <- function(x, y, z) {
+  if (!requireNamespace("foo", quietly = TRUE)) {
+    stop("Need foo! Use install.packages('foo').")
+  }
+  foo::bar(x, y) + z
+}
+```
+
+Why use Suggests?  
+1. Needed for development, e.g. testthat  
+2. Heavy dependencies and only needed in special situations  
+    * ggplot2 has suggests that are only used by a few geoms, so they are not listed in Imports, but only in 
+    suggests, so that only in those specific scenarios, they will be required.   
+3. Used only in vignettes or examples.   
+
+
+
+####Devtools use_package()
+
+```{r, eval=FALSE, results="hide"}
+# use_package() will modify the DESCRIPTION
+# and remind you how to use the function.
+
+#Navigate to your new rv3 andopen .Rproj
+#Probably a good idea to have a separate script in package to handle this.
+devtools::use_package("ggplot2")
+devtools::use_package("ggplot2", "suggests")
+
+# load_all() will fail if imported packages are
+# not installed. Up to you to ensure suggested
+# packages have own checks.
+# Installs all dependencies (including suggested)
+devtools::install_deps(deps = TRUE)
+```
+
+
+NEVER use library() or require() in your package functions. This is the job of Imports in Description.  
+
+
+
+###man/
+
+Via roxygen2(). 
+
+Note that roxygen comments have a special convention: regular comment with single quote: `#'`  
+
+Roxygen turns R into Rd (R Documentation).  
+
+General documentation workflow:  
+1. Document  
+2. devtools::document() or CTRL + SHIFT + D  
+3. View  
+4. Repeat 1:3 as required  
+    * Note that `@export` updates can be handled in this manner as well; check NAMESPACE  
+
+
+Order is always:  
+1. Title (required)  
+2. Description (optional)  
+3. Details (optional)  
+
+Most functions will also use:  
+1. @param; describe inputs  
+2. @examples; how it works  
+3. @seealso; pointers to related functions  
+4. @return; what it returns  
+5. @export  
+
+Look at RDocumentation.org  
+
+####Formatting commands:
+
+```{r, eval=FALSE, results="hide"}
+
+\code{} Inline R code
+\eqn{} Inline equation
+(standard latex)
+\emph{} Italic text
+\strong{} Bold text
+
+#' A bulleted list:
+#' \itemize{
+#' \item First item
+#' \item Second item
+#' }
+#' An ordered list:
+#' \enumerate{
+#' \item First item
+#' \item Second item
+#' }
+
+\link{foo} Link to foo in current package
+\link[bar]{foo} Link to foo in package bar
+\url{http://rstudio.com} Link to website
+\href{http://rstudio.com}{Rstudio} Link to website with custom text
+\email{hadley@rstudio.com} Email address
+```
+
+
+####To Preview links, workflow2
+
+CTRL + SHIFT + B
+
+Consider:  
+
+```{r, eval=FALSE}
+#In documentation for P (rv2): 
+#` @seealso
+#` \link{rv}
+#
+# save
+# document()
+# CTRL + SHIFT + L
+# ?P #document updated, but link not active
+# CTRL + SHIFT + B
+# ?P #link now active
+
+```
+
+
+###Multiple functions in one file
+
+For example, see `?rnorm`  
+Useful for functions that are closely related
+
+*Look into this some more*  
+Check moments.R R for how this is done.  
+Use `@name` for the first function  
+Use `@rdname` for the next function(s), in the same script  
+* Make sure that the names are the same throughout. 
+* Use the name for the (set of) functions
+
+
+Also, test `devtools::check_man()`
+
+###Vignettes
+
+Easiest way:  
+
+```{r, eval= FALSE, results="hide"}
+devtools::use_vignette("name")
+# Adds to DESCRIPTION
+Suggests: knitr
+VignetteBuilder: knitr
+# Creates vignettes/
+# Drafts vignettes/name.Rmd
+```
+
+
+###Debugging
+
+1. print()
+2. debugonce()
+3. browser()
+4. options(error = recover)
+5. options(warn = 2) #turn all warnings into errors
+
+
+```{r, eval=FALSE}
+f <- function(x) g(x)
+g <- function(y) h(y)
+h <- function(z) {
+  stop("oops")
+}
+
+```
+
+
+The goal is to find and fix problems.   
+
+###Testing (automated test)
+
+Why?  
+1. check correctness
+2. faster and more reliable than manual testing
+3. stop bugs from coming back
+    * so that one bugfix does not create another. 
+4. reduce maintenance burden
+5. enable refactoring
+6. force good design
+7. think adversarially
+8. guard against future developers
+9, communicate with colleagues
+10. guard against complex interactions
+11. social pressure
+12. enable integration
+
+Code that can be tested easily, and often is a consequence of modular design.  
+When you stop working, leave a test failing-- makes it easier to pick up.  
+Easier to make big changes without fear of accidentally breaking anything.  
+
+####Unit testing with testthat
+
+`length(revdep("testthat"))` #1395 packages as of today.  
+
+So far, we have been doing exploratory coding.  
+Automated testing using CTRL + SHIFT + T (`devtools::test()`)  
+
+Write R Code, reload, test.  
+Actually, you just write R code, test. No need to reload. Quite nice.  
+
+Using test_me  
+
+```{r, eval=FALSE}
+library(cover)
+#Runs all tests in your package and tells you what lines have not been tested. 
+#Does not mean correct or not, just whether tested. 
+#Probably overkill to aim for 100% test coverage-- focus on the really critical pieces. 
+#This is how you get the coverage percentage.
+#And get codecov
+
+#How would you test the "P" function in rv2?
+context("probability")
+test_that("probability of coin flip is correct", {
+  coin <- rv(1:2)
+  
+  expect_equal(P(coin == 1), 0.5)
+  expect_equal(P(coin <=2), 1)
+  expect_equal(P(coin < 0), 0)
+})
+
+#Shortcut to create test structure
+devtools::create("./colSummary")
+devtools::use_testthat()
+devtools::use_test("test_colSummary")
+use_package("purrr") #shortcut to add Imports to namespace with package(s)
+#Insert roxygen skeleton works only if you have the fun, put cursor at beginning of fun, insert skeleton
+
+#Regression tests: Not asserting what it should be, but what it used to be
+expect_output_file() #spits out a file, and in the future, will tell you if the previous version is different from latest
+test_that("rvs sum correctly", {
+  dice <- rv(1:6)
+  expect_output_file(print(dice + dice + dice + dice + dice),
+  "sum_of_five_dice.txt", update = TRUE)
+})
+
+#Would test plot.rv() using vdiffr (upcoming package?)
+```
+
+Writing tests is the most difficult part.  
+
+###NAMESPACE
+
+Name conflicts-- if a name conflicts in two packages, the one called last wins by default; use double colon to be explicit.  
+
+The other benefit of being explicit is that it insulates functions in your package from anything that might and likely will 
+occur in users' namespace.  
+
+A namespace splits functions into two classes: internal vs. external.  
+By default, roxygen2 will export everything that does not belong with a dot.  
+It is better to be explicit.  
+
+Exporting the minimum number of functions is best practice, as it minimizes chances of namespace conflicts.  
+
+Use the `@export` tag in roxygen2.  
+
+Don't export internal helpers. 
+
+
+###Imports
+
+Particularly important for something like `magrittr %>%`.  
+This is where you use `@import` in your actual function.  
+The benefit of this is less typing. But it is less obvious when reading the code where these functions 
+are coming from. 
+
+Could also create an imports.R file to only import certain functions from certain packages. 
+`#' @importFrom magrittr %>%` for example.  
+
+
+```{r, eval=FALSE}
+#' @import foo
+#' @omport bar
+fun <- function(x) {
+  fun1(x) + fun2(x)
+}
+
+#Assume that fun1 and fun2 are from your package, and this works today. 
+#Next year, the bar package adds fun1. Now you have a namespace conflict. 
+#Generally, you should avoid using @import in your actual function scripts. 
+
+#Things listed in NAMESPACE are basically functions. 
+
+```
+
+###R CMD CHECK
+
+Useful even for local packages, even though false positives are possible.  
+```{r, eval=FALSE}
+#CTRL + SHIFT + E
+#or
+#devtools::check()
+```
+
+
